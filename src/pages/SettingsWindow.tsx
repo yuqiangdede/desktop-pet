@@ -99,8 +99,7 @@ export function SettingsWindow() {
     <main className="settings-shell">
       <header className="settings-header">
         <div>
-          <h1>Desktop Pet 设置</h1>
-          <p>模型、角色、动画和窗口参数</p>
+          <h1>设置</h1>
         </div>
       </header>
       {(configError || characterError) && <div className="error-banner">{configError || characterError}</div>}

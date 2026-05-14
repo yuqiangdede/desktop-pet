@@ -700,26 +700,30 @@ button {
 }
 
 .settings-shell {
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .settings-layout {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.75fr);
-  gap: 12px;
-  padding: 12px 14px;
+  gap: 10px;
+  padding: 10px 12px 12px;
   align-items: start;
 }
 
 .settings-section--model {
-  grid-row: span 4;
+  grid-row: span 3;
 }
 
 .settings-section {
   display: flex;
   flex-direction: column;
-  gap: 9px;
-  padding: 12px;
+  gap: 8px;
+  padding: 10px;
   border: 1px solid rgba(84, 62, 50, 0.12);
   border-radius: 8px;
   background: #fffdf9;
@@ -733,7 +737,7 @@ button {
 .settings-section label {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
   color: #5d4d45;
   font-size: 12px;
 }
@@ -758,13 +762,13 @@ button {
 
 .settings-section input,
 .settings-section select {
-  height: 34px;
+  height: 32px;
   padding: 0 9px;
 }
 
 .settings-section textarea {
-  padding: 9px;
-  min-height: 96px;
+  padding: 8px 9px;
+  min-height: 88px;
   resize: vertical;
 }
 
@@ -796,7 +800,7 @@ button {
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
-  padding-bottom: 8px;
+  padding-bottom: 0;
 }
 
 .settings-actions .settings-status {
@@ -829,5 +833,21 @@ button {
 @media (max-width: 760px) {
   .settings-layout {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 760px) {
+  .settings-layout {
+    gap: 8px;
+    padding: 8px 10px 10px;
+  }
+
+  .settings-section {
+    gap: 7px;
+    padding: 9px;
+  }
+
+  .settings-section textarea {
+    min-height: 76px;
   }
 }

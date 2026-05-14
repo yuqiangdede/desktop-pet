@@ -92,6 +92,8 @@ export function SettingForm({
               onChange={(event) => setDraft({ ...draft, model: { ...model, max_tokens: Number(event.target.value) } })}
             />
           </label>
+        </div>
+        <div className="form-grid">
           <label>
             Context Rounds
             <input
@@ -100,6 +102,18 @@ export function SettingForm({
               max="50"
               value={model.contextRounds}
               onChange={(event) => setDraft({ ...draft, model: { ...model, contextRounds: Number(event.target.value) } })}
+            />
+          </label>
+          <label>
+            Max Sessions
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={chatConfig.maxSessions}
+              onChange={(event) =>
+                setDraft({ ...draft, chat: { ...chatConfig, maxSessions: Number(event.target.value) } })
+              }
             />
           </label>
         </div>
@@ -198,22 +212,6 @@ export function SettingForm({
         <div className="settings-inline">
           <small className="settings-hint">控制眨眼、漂浮、摇头和空闲动作的整体运行速度。</small>
         </div>
-      </section>
-
-      <section className="settings-section">
-        <h2>聊天历史</h2>
-        <label>
-          最多保留对话
-          <input
-            type="number"
-            min="1"
-            max="100"
-            value={chatConfig.maxSessions}
-            onChange={(event) =>
-              setDraft({ ...draft, chat: { ...chatConfig, maxSessions: Number(event.target.value) } })
-            }
-          />
-        </label>
       </section>
 
       <div className="settings-actions">

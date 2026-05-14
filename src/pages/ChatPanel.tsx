@@ -32,14 +32,15 @@ export function ChatPanel() {
     failMessage,
     clear
   } = useChatStore();
-  const { config, load } = useConfigStore();
+  const { config, load, subscribeToChanges } = useConfigStore();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
 
   useEffect(() => {
+    subscribeToChanges();
     load();
     loadSessions();
-  }, [load, loadSessions]);
+  }, [load, loadSessions, subscribeToChanges]);
 
   useEffect(() => {
     const offDelta = openaiClient.onDelta(({ requestId, delta }) => appendDelta(requestId, delta));
