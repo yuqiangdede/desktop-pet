@@ -99,15 +99,16 @@ button {
   position: relative;
   transform-origin: 50% 50%;
   pointer-events: none;
+  --animation-speed: 1;
 }
 
 .character--float {
-  animation: pet-float 3.8s ease-in-out infinite;
+  animation: pet-float calc(3.8s / var(--animation-speed)) ease-in-out infinite;
 }
 
 .character--shake .character__head,
 .character--shake .character__eyes {
-  animation: pet-head 5.2s ease-in-out infinite;
+  animation: pet-head calc(5.2s / var(--animation-speed)) ease-in-out infinite;
   transform-origin: 50% 70%;
 }
 
@@ -144,11 +145,11 @@ button {
 }
 
 .character__eyes--open {
-  animation: eye-open var(--blink-interval) steps(1, end) infinite;
+  animation: eye-open calc(var(--blink-interval) / var(--animation-speed)) steps(1, end) infinite;
 }
 
 .character__eyes--closed {
-  animation: eye-closed var(--blink-interval) steps(1, end) infinite;
+  animation: eye-closed calc(var(--blink-interval) / var(--animation-speed)) steps(1, end) infinite;
 }
 
 .is-hidden {
@@ -735,6 +736,24 @@ button {
   gap: 5px;
   color: #5d4d45;
   font-size: 12px;
+}
+
+.range-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.range-value {
+  color: #7a6357;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-hint {
+  color: #7d6f68;
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .settings-section input,

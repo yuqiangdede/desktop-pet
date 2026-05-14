@@ -13,6 +13,7 @@ export interface AnimationConfig {
   blink: boolean;
   headShake: boolean;
   float: boolean;
+  speedMultiplier: number;
   blinkIntervalMs: number;
   blinkDurationMs: number;
 }
@@ -63,6 +64,7 @@ export const defaultConfig: AppConfig = {
     blink: true,
     headShake: true,
     float: true,
+    speedMultiplier: 1,
     blinkIntervalMs: 3600,
     blinkDurationMs: 160
   },

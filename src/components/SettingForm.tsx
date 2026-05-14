@@ -175,6 +175,32 @@ export function SettingForm({
       </section>
 
       <section className="settings-section">
+        <h2>动画设置</h2>
+        <label>
+          <span className="range-label">
+            <span>动画速度</span>
+            <span className="range-value">{draft.animation.speedMultiplier.toFixed(1)}x</span>
+          </span>
+          <input
+            type="range"
+            min="0.5"
+            max="2"
+            step="0.1"
+            value={draft.animation.speedMultiplier}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                animation: { ...draft.animation, speedMultiplier: Number(event.target.value) }
+              })
+            }
+          />
+        </label>
+        <div className="settings-inline">
+          <small className="settings-hint">控制眨眼、漂浮、摇头和空闲动作的整体运行速度。</small>
+        </div>
+      </section>
+
+      <section className="settings-section">
         <h2>聊天历史</h2>
         <label>
           最多保留对话

@@ -42,9 +42,17 @@ function isImageCharacter(config: CharacterConfig) {
 
 const SIMPLE_IDLE_CHARACTER_IDS = new Set<string>();
 
+function motionStyle(speedMultiplier: number): CSSProperties {
+  return {
+    ["--animation-speed" as string]: String(speedMultiplier)
+  };
+}
+
 export function CharacterRenderer({ character, config }: CharacterRendererProps) {
   const { canvas } = character.config;
   const animation = config.animation;
+  const speedMultiplier = Math.max(0.1, animation.speedMultiplier || 1);
+  const inverseSpeed = 1 / speedMultiplier;
   const videoCharacter = isVideoCharacter(character.config);
   const imageCharacter = isImageCharacter(character.config);
   const isFullBodyBaseCharacter = SIMPLE_IDLE_CHARACTER_IDS.has(character.config.id);
@@ -101,7 +109,7 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
 
     const scheduleNextAction = (initial = false) => {
       if (cancelled) return;
-      const delay = initial ? 700 : 1800 + Math.random() * 2600;
+      const delay = (initial ? 700 : 1800 + Math.random() * 2600) * inverseSpeed;
       startTimer = window.setTimeout(() => {
         const action = weightedIdleAction(idleActions);
         setIdleState({ action, frameIndex: 0, loopCount: 0 });
@@ -112,7 +120,7 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
       const current = idleStateRef.current;
       if (!current || cancelled) return;
 
-      const frameDelay = Math.max(40, Math.round(1000 / current.action.fps));
+      const frameDelay = Math.max(20, Math.round((1000 / current.action.fps) * inverseSpeed));
       frameTimer = window.setTimeout(() => {
         setIdleState((latest) => {
           if (!latest) return latest;
@@ -153,7 +161,8 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
           className={["character", "character--video", animation.float ? "character--float" : ""].join(" ")}
           style={{
             width: canvas.width * scale,
-            height: canvas.height * scale
+            height: canvas.height * scale,
+            ...motionStyle(speedMultiplier)
           }}
         >
           <video
@@ -184,7 +193,8 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
           className={["character", "character--image", animation.float ? "character--float" : ""].join(" ")}
           style={{
             width: canvas.width * scale,
-            height: canvas.height * scale
+            height: canvas.height * scale,
+            ...motionStyle(speedMultiplier)
           }}
         >
           <img
@@ -220,6 +230,7 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
           width: canvas.width,
           height: canvas.height,
           transform: `scale(${scale})`,
+          ...motionStyle(speedMultiplier),
           ["--blink-interval" as string]: `${animation.blinkIntervalMs}ms`,
           ["--blink-duration" as string]: `${animation.blinkDurationMs}ms`
         }}
