@@ -3,6 +3,7 @@ import path from "node:path";
 import { app, protocol } from "electron";
 import { createPetWindow, createTray, ensurePetWindow } from "./windowManager";
 import { getStoredConfig, registerIpc } from "./ipc";
+import { resolveAssetRoot } from "./assetRegistry";
 
 app.setName("Desktop Pet");
 protocol.registerSchemesAsPrivileged([
@@ -26,7 +27,9 @@ app.whenReady().then(() => {
       const encodedBase = parts.shift();
       if (!encodedBase) return new Response("Missing asset base", { status: 400 });
 
-      const baseDir = Buffer.from(encodedBase, "base64url").toString("utf-8");
+      const assetKey = decodeURIComponent(encodedBase);
+      const baseDir = resolveAssetRoot(assetKey);
+      if (!baseDir) return new Response("Missing asset root", { status: 404 });
       const relativePath = parts.map(decodeURIComponent).join(path.sep);
       const resolvedBase = path.resolve(baseDir);
       const resolvedFile = path.resolve(resolvedBase, relativePath);

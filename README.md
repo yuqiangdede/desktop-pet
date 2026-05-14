@@ -17,8 +17,11 @@
 
 ```powershell
 npm install
+npm install mermaid react-markdown remark-gfm
 npm run dev
 ```
+
+如果你是从旧环境迁移，或者本地依赖不完整，也可以先单独补装这三个包，再启动应用。
 
 应用会启动桌宠窗口。托盘菜单可打开设置、聊天、重置位置或退出。
 
