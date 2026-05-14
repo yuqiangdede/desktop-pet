@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { AppConfig } from "../types/config";
-import type { CharacterIdleAction, CharacterInfo, CharacterLayer } from "../types/character";
+import type { CharacterConfig, CharacterIdleAction, CharacterInfo, CharacterLayer } from "../types/character";
 
 interface CharacterRendererProps {
   character: CharacterInfo;
@@ -32,21 +32,32 @@ function idleFrameFile(action: CharacterIdleAction, frameIndex: number) {
   return `${action.path}/frame-${String(frameIndex).padStart(3, "0")}.png`;
 }
 
-const SIMPLE_IDLE_CHARACTER_IDS = new Set(["default-girl", "default-boy", "golden-dog", "ragdoll-cat"]);
+function isVideoCharacter(config: CharacterConfig) {
+  return config.renderMode === "video" && Boolean(config.video);
+}
+
+function isImageCharacter(config: CharacterConfig) {
+  return config.renderMode === "image" && Boolean(config.image);
+}
+
+const SIMPLE_IDLE_CHARACTER_IDS = new Set<string>();
 
 export function CharacterRenderer({ character, config }: CharacterRendererProps) {
-  const { canvas, layers } = character.config;
+  const { canvas } = character.config;
   const animation = config.animation;
+  const videoCharacter = isVideoCharacter(character.config);
+  const imageCharacter = isImageCharacter(character.config);
+  const isFullBodyBaseCharacter = SIMPLE_IDLE_CHARACTER_IDS.has(character.config.id);
   const src = (file: string) => `${character.assetBaseUrl}/${file}?v=${encodeURIComponent(character.config.version)}`;
   const usableWidth = Math.max(1, config.window.petWidth - 8);
   const usableHeight = Math.max(1, config.window.petHeight - 8);
   const scale = Math.min(usableWidth / canvas.width, usableHeight / canvas.height);
   const idleActions = useMemo(
     () =>
-      SIMPLE_IDLE_CHARACTER_IDS.has(character.config.id)
+      isFullBodyBaseCharacter
         ? []
         : (character.config.animation.idleActions ?? []).filter((action) => action.frameCount > 0 && action.fps > 0),
-    [character.config.id, character.config.animation.idleActions]
+    [isFullBodyBaseCharacter, character.config.animation.idleActions]
   );
   const idleEnabled = idleActions.length > 0;
   const [idleState, setIdleState] = useState<{ action: CharacterIdleAction; frameIndex: number; loopCount: number } | null>(null);
@@ -134,6 +145,68 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
 
   const idleFrameSrc = idleState ? src(idleFrameFile(idleState.action, idleState.frameIndex)) : null;
 
+  if (videoCharacter && character.config.video) {
+    const video = character.config.video;
+    return (
+      <div className="character-stage">
+        <div
+          className={["character", "character--video", animation.float ? "character--float" : ""].join(" ")}
+          style={{
+            width: canvas.width * scale,
+            height: canvas.height * scale
+          }}
+        >
+          <video
+            className="character__video"
+            style={{
+              left: (video.x ?? 0) * scale,
+              top: (video.y ?? 0) * scale,
+              width: (video.width ?? canvas.width) * scale,
+              height: (video.height ?? canvas.height) * scale
+            }}
+            src={src(video.file)}
+            autoPlay
+            loop
+            muted
+            playsInline
+            draggable={false}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  if (imageCharacter && character.config.image) {
+    const image = character.config.image;
+    return (
+      <div className="character-stage">
+        <div
+          className={["character", "character--image", animation.float ? "character--float" : ""].join(" ")}
+          style={{
+            width: canvas.width * scale,
+            height: canvas.height * scale
+          }}
+        >
+          <img
+            className="character__image"
+            style={{
+              left: (image.x ?? 0) * scale,
+              top: (image.y ?? 0) * scale,
+              width: (image.width ?? canvas.width) * scale,
+              height: (image.height ?? canvas.height) * scale
+            }}
+            src={src(image.file)}
+            alt=""
+            draggable={false}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  const layers = character.config.layers;
+  if (!layers) return null;
+
   return (
     <div className="character-stage">
       <div
@@ -141,7 +214,7 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
           "character",
           idleFrameSrc ? "character--idle-frame" : "",
           animation.float ? "character--float" : "",
-          animation.headShake ? "character--shake" : ""
+          animation.headShake && !isFullBodyBaseCharacter ? "character--shake" : ""
         ].join(" ")}
         style={{
           width: canvas.width,

@@ -1,0 +1,22 @@
+{
+  "id": "huang-illustration",
+  "name": "煌",
+  "version": "0.1.0",
+  "renderMode": "image",
+  "canvas": {
+    "width": 1114,
+    "height": 1441
+  },
+  "image": {
+    "file": "image.png",
+    "x": -168,
+    "y": -7,
+    "width": 1452,
+    "height": 1452
+  },
+  "animation": {
+    "blink": false,
+    "headShake": false,
+    "float": false
+  }
+}

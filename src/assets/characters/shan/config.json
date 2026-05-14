@@ -1,0 +1,22 @@
+{
+  "id": "shan",
+  "name": "山",
+  "version": "0.1.0",
+  "renderMode": "image",
+  "canvas": {
+    "width": 591,
+    "height": 969
+  },
+  "image": {
+    "file": "image.png",
+    "x": -223,
+    "y": -21,
+    "width": 1024,
+    "height": 1024
+  },
+  "animation": {
+    "blink": false,
+    "headShake": false,
+    "float": false
+  }
+}

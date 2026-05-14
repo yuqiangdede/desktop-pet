@@ -6,6 +6,22 @@ export interface CharacterLayer {
   height: number;
 }
 
+export interface CharacterVideo {
+  file: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
+export interface CharacterImage {
+  file: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
 export interface CharacterIdleAction {
   id: string;
   name: string;
@@ -20,16 +36,19 @@ export interface CharacterConfig {
   id: string;
   name: string;
   version: string;
+  renderMode?: "layers" | "video" | "image";
   canvas: {
     width: number;
     height: number;
   };
-  layers: {
+  layers?: {
     body: CharacterLayer;
     head: CharacterLayer;
     eyeOpen: CharacterLayer;
     eyeClose: CharacterLayer;
   };
+  video?: CharacterVideo;
+  image?: CharacterImage;
   animation: {
     blink: boolean;
     headShake: boolean;

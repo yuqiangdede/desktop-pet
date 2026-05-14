@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { MarkdownMessage } from "./MarkdownMessage";
 import type { ChatMessage } from "../types/chat";
 
 interface MessageListProps {
@@ -22,7 +23,13 @@ export function MessageList({ messages, assistantName }: MessageListProps) {
       {messages.map((message) => (
         <div key={message.id} className={`message message--${message.role} ${message.error ? "message--error" : ""}`}>
           <div className="message__role">{message.role === "user" ? "你" : assistantName}</div>
-          <div className="message__content">{message.content || "..."}</div>
+          <div className="message__content">
+            {message.role === "assistant" && !message.error ? (
+              <MarkdownMessage content={message.content} />
+            ) : (
+              message.content || "..."
+            )}
+          </div>
         </div>
       ))}
     </div>

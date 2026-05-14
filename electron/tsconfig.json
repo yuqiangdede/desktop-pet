@@ -12,5 +12,5 @@
     "resolveJsonModule": true,
     "types": ["node", "electron"]
   },
-  "include": ["./**/*.ts", "../src/types/**/*.ts"]
+  "include": ["./**/*.ts", "../src/types/**/*.ts", "../src/types/**/*.d.ts"]
 }

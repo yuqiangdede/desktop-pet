@@ -59,7 +59,12 @@ function activeSession(state: ChatState) {
 }
 
 async function persist(sessions: ChatSession[]) {
-  await chatService.saveSessions(sortSessions(sessions));
+  return chatService.saveSessions(sortSessions(sessions));
+}
+
+function nextActiveSessionId(sessions: ChatSession[], preferredId: string | null) {
+  if (preferredId && sessions.some((session) => session.id === preferredId)) return preferredId;
+  return sessions[0]?.id ?? null;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -88,7 +93,9 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const session = newSession();
     const sessions = sortSessions([session, ...get().sessions]);
     set({ sessions, activeSessionId: session.id, activeRequestId: null, loading: false, error: null });
-    void persist(sessions);
+    void persist(sessions).then((saved) => {
+      set({ sessions: saved, activeSessionId: nextActiveSessionId(saved, get().activeSessionId) });
+    });
   },
   selectSession: (id) => {
     if (get().loading) return;
@@ -100,7 +107,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const sessions = remaining.length ? remaining : [newSession()];
     const activeSessionId = get().activeSessionId === id ? sessions[0].id : get().activeSessionId;
     set({ sessions: sortSessions(sessions), activeSessionId, error: null });
-    await persist(sessions);
+    const saved = await persist(sessions);
+    set({ sessions: saved, activeSessionId: nextActiveSessionId(saved, activeSessionId) });
   },
   sendMessage: async (content) => {
     const trimmed = content.trim();
@@ -116,7 +124,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     };
     const sessions = sortSessions([nextSession, ...get().sessions.filter((session) => session.id !== nextSession.id)]);
     set({ sessions, activeSessionId: nextSession.id, loading: true, error: null });
-    await persist(sessions);
+    const saved = await persist(sessions);
+    set({ sessions: saved, activeSessionId: nextActiveSessionId(saved, nextSession.id) });
     try {
       const messagesForApi = nextSession.messages.filter((message) => message.role !== "assistant" || message.content);
       const { requestId } = await chatService.send(messagesForApi);

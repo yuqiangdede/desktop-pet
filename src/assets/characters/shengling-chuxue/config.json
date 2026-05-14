@@ -1,0 +1,22 @@
+{
+  "id": "shengling-chuxue",
+  "name": "圣聆初雪",
+  "version": "0.1.0",
+  "renderMode": "video",
+  "canvas": {
+    "width": 438,
+    "height": 434
+  },
+  "video": {
+    "file": "idle.webm",
+    "x": -275,
+    "y": -378,
+    "width": 1000,
+    "height": 1000
+  },
+  "animation": {
+    "blink": false,
+    "headShake": false,
+    "float": false
+  }
+}

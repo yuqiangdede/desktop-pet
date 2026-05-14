@@ -21,8 +21,12 @@ export interface DesktopPetApi {
   };
   character: {
     list(): Promise<CharacterInfo[]>;
-    importDirectory(): Promise<CharacterInfo | null>;
+    pickVideoFile(): Promise<string | null>;
+    pickImageFile(): Promise<string | null>;
+    importVideoFile(sourcePath: string, displayName?: string): Promise<CharacterInfo>;
+    importImageFile(sourcePath: string, displayName?: string): Promise<CharacterInfo>;
     setActive(id: string): Promise<AppConfig>;
+    delete(id: string): Promise<AppConfig>;
     restoreDefault(): Promise<AppConfig>;
   };
   window: {

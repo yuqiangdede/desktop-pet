@@ -1,0 +1,22 @@
+{
+  "id": "huang-video",
+  "name": "煌",
+  "version": "0.1.0",
+  "renderMode": "video",
+  "canvas": {
+    "width": 433,
+    "height": 517
+  },
+  "video": {
+    "file": "idle.webm",
+    "x": -269,
+    "y": -379,
+    "width": 1000,
+    "height": 1000
+  },
+  "animation": {
+    "blink": false,
+    "headShake": false,
+    "float": false
+  }
+}

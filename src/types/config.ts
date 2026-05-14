@@ -24,22 +24,27 @@ export interface WindowConfig {
   opacity: number;
 }
 
+export interface ChatConfig {
+  maxSessions: number;
+}
+
 export interface AppConfig {
   petName: string;
   model: ModelConfig;
   animation: AnimationConfig;
   window: WindowConfig;
+  chat: ChatConfig;
   activeCharacterId: string;
 }
 
 export const defaultConfig: AppConfig = {
-  petName: "lala",
+  petName: "圣聆初雪",
   model: {
     apiBaseUrl: "https://api.openai.com/v1",
     apiKey: "",
     model: "gpt-4o-mini",
     temperature: 0.7,
-    max_tokens: 800,
+    max_tokens: 0,
     contextRounds: 6,
     stream: true,
     systemPrompt: `你是一个中文桌面助手，面向 Java/Python 开发者、运维人员和系统安全负责人。
@@ -67,5 +72,8 @@ export const defaultConfig: AppConfig = {
     alwaysOnTop: true,
     opacity: 1
   },
-  activeCharacterId: "default-girl"
+  chat: {
+    maxSessions: 10
+  },
+  activeCharacterId: "shengling-chuxue"
 };

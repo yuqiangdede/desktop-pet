@@ -27,8 +27,12 @@ const api: DesktopPetApi = {
   },
   character: {
     list: () => ipcRenderer.invoke("character:list"),
-    importDirectory: () => ipcRenderer.invoke("character:importDirectory"),
+    pickVideoFile: () => ipcRenderer.invoke("character:pickVideoFile"),
+    pickImageFile: () => ipcRenderer.invoke("character:pickImageFile"),
+    importVideoFile: (sourcePath, displayName) => ipcRenderer.invoke("character:importVideoFile", sourcePath, displayName),
+    importImageFile: (sourcePath, displayName) => ipcRenderer.invoke("character:importImageFile", sourcePath, displayName),
     setActive: (id) => ipcRenderer.invoke("character:setActive", id),
+    delete: (id) => ipcRenderer.invoke("character:delete", id),
     restoreDefault: () => ipcRenderer.invoke("character:restoreDefault")
   },
   window: {

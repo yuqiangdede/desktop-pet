@@ -5,11 +5,11 @@
 ## 功能
 
 - 透明置顶桌宠窗口，支持拖拽移动。
-- PNG 分层角色渲染：`body.png`、`head.png`、`eye-open.png`、`eye-close.png`。
+- 角色渲染：支持 PNG 分层角色、单张 PNG 静态角色，也支持 WebM 自带动画角色。
 - 轻量动画：眨眼、轻微摇头、上下浮动，并支持内置角色的随机待机动作。
 - 聊天面板：用户消息、AI 回复、流式输出、清空聊天、错误提示。
 - OpenAI Chat Completions 兼容接口：`POST {apiBaseUrl}/chat/completions`。
-- 设置页：API Base URL、API Key、Model、Temperature、Max Tokens、Stream、System Prompt、角色导入、动画和窗口配置。
+- 设置页：API Base URL、API Key、Model、Temperature、Max Tokens、Stream、System Prompt、最多保留对话、PNG / WebM 角色导入、动画和窗口配置。
 - 配置保存到 Electron 用户数据目录，不写死 API Key。
 - 支持 Windows 打包。
 
@@ -45,7 +45,7 @@ npm run dev
 
 ## 自定义角色
 
-角色目录格式：
+PNG 分层角色目录格式：
 
 ```text
 character-name/
@@ -59,10 +59,22 @@ character-name/
 `config.json` 示例可参考：
 
 ```text
-src/assets/characters/default-girl/config.json
+src/assets/characters/shengling-chuxue/config.json
 ```
 
-在设置页点击“导入角色目录”，选择上述目录即可。导入成功后可在角色下拉框切换。
+单张 PNG 静态角色可以直接导入 `.png` 文件，不需要准备动画帧。应用会复制图片、读取尺寸并自动生成角色目录和 `config.json`，桌宠窗口可通过右下角拖拽缩放。
+
+WebM 动画角色可以直接导入单个 `.webm` 文件，应用会自动生成角色目录和 `config.json`。
+
+也可以手动准备 WebM 动画角色目录：
+
+```text
+character-name/
+  config.json
+  idle.webm
+```
+
+在设置页点击“导入 PNG 图片”可直接选择 `.png` 生成静态角色；点击“导入 WebM 文件”可直接选择 `.webm` 生成新角色。导入成功后可在角色下拉框切换。
 
 ## 默认角色资源
 
@@ -72,21 +84,11 @@ src/assets/characters/default-girl/config.json
 src/assets/characters/
 ```
 
-当前仓库内置了 4 套可运行的透明 PNG 角色资源：
+当前仓库内置了 1 套 WebM 动画角色资源：
 
-- `default-girl`：默认名 `lala`
-- `default-boy`：默认名 `kaka`
-- `ragdoll-cat`：默认名 `tutu`
-- `golden-dog`：默认名 `gaga`
+- `shengling-chuxue`：默认名 `圣聆初雪`
 
-每个角色目录包含基础分层资源和约 20 个待机动作帧。后续替换角色立绘时，按同名文件替换：
-
-- `body.png`
-- `head.png`
-- `eye-open.png`
-- `eye-close.png`
-
-替换时保持透明背景 PNG，并按 `config.json` 调整图层位置、尺寸和 `idleActions` 帧数。
+替换 WebM 动画角色时更新 `video.file` 指向的视频文件。PNG 分层角色可通过直接编辑角色目录使用，并按 `config.json` 调整图层位置、尺寸和 `idleActions` 帧数。
 
 ## 打包
 
@@ -97,9 +99,18 @@ npm run dist:win
 
 Windows 安装包会输出到 `release/`。
 
+如果你需要一个可直接双击运行、方便发给别人的便携版单文件：
+
+```powershell
+npm run build
+npm run dist:portable
+```
+
+便携版会在 `release/` 下输出一个 Windows `exe` 文件，适合直接分发，不需要额外安装步骤。
+
 ## 安全约束
 
 - Electron 不开启 `nodeIntegration`。
 - 渲染进程只能通过 `preload.ts` 暴露的 `window.desktopPet` 与主进程通信。
 - API Key 只保存在用户数据目录的配置文件中，不写死在源码里。
-- 不包含 Live2D、语音、视频或摄像头功能。
+- 不包含 Live2D、语音或摄像头功能。

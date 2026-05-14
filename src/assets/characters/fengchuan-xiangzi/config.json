@@ -1,0 +1,22 @@
+{
+  "id": "fengchuan-xiangzi",
+  "name": "丰川祥子",
+  "version": "0.1.0",
+  "renderMode": "video",
+  "canvas": {
+    "width": 357,
+    "height": 377
+  },
+  "video": {
+    "file": "idle.webm",
+    "x": -376,
+    "y": -435,
+    "width": 1000,
+    "height": 1000
+  },
+  "animation": {
+    "blink": false,
+    "headShake": false,
+    "float": false
+  }
+}

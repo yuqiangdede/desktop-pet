@@ -1,4 +1,4 @@
-import { RotateCcw, Save, TestTube2, Upload } from "lucide-react";
+import { Film, Image, RotateCcw, Save, TestTube2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AppConfig } from "../types/config";
 import type { CharacterInfo } from "../types/character";
@@ -10,11 +10,24 @@ interface SettingFormProps {
   onSave: (config: AppConfig) => Promise<void>;
   onReset: () => Promise<void>;
   onTest: (config: AppConfig) => Promise<void>;
-  onImport: () => Promise<void>;
+  onImportVideo: () => Promise<void>;
+  onImportImage: () => Promise<void>;
+  onDeleteCharacter: (id: string) => Promise<void>;
   onCharacterChange: (id: string) => Promise<void>;
 }
 
-export function SettingForm({ config, characters, status, onSave, onReset, onTest, onImport, onCharacterChange }: SettingFormProps) {
+export function SettingForm({
+  config,
+  characters,
+  status,
+  onSave,
+  onReset,
+  onTest,
+  onImportVideo,
+  onImportImage,
+  onDeleteCharacter,
+  onCharacterChange
+}: SettingFormProps) {
   const [draft, setDraft] = useState(config);
 
   useEffect(() => {
@@ -23,6 +36,9 @@ export function SettingForm({ config, characters, status, onSave, onReset, onTes
 
   const model = draft.model;
   const windowConfig = draft.window;
+  const chatConfig = draft.chat;
+  const selectedCharacter = characters.find((character) => character.id === draft.activeCharacterId);
+  const canDeleteSelectedCharacter = Boolean(selectedCharacter && !selectedCharacter.builtin);
   const changeCharacter = (id: string) => {
     const selected = characters.find((character) => character.id === id);
     setDraft({ ...draft, activeCharacterId: id, petName: selected?.config.name ?? draft.petName });
@@ -70,7 +86,7 @@ export function SettingForm({ config, characters, status, onSave, onReset, onTes
             Max Tokens
             <input
               type="number"
-              min="1"
+              min="0"
               max="8192"
               value={model.max_tokens}
               onChange={(event) => setDraft({ ...draft, model: { ...model, max_tokens: Number(event.target.value) } })}
@@ -127,8 +143,19 @@ export function SettingForm({ config, characters, status, onSave, onReset, onTes
             ))}
           </select>
         </label>
-        <button className="secondary-button" type="button" onClick={onImport}>
-          <Upload size={16} /> 导入角色目录
+        <button className="secondary-button" type="button" onClick={onImportVideo}>
+          <Film size={16} /> 导入 WebM 文件
+        </button>
+        <button className="secondary-button" type="button" onClick={onImportImage}>
+          <Image size={16} /> 导入 PNG 图片
+        </button>
+        <button
+          className="danger-button"
+          type="button"
+          disabled={!canDeleteSelectedCharacter}
+          onClick={() => onDeleteCharacter(draft.activeCharacterId)}
+        >
+          <Trash2 size={16} /> 删除当前角色
         </button>
       </section>
 
@@ -143,6 +170,22 @@ export function SettingForm({ config, characters, status, onSave, onReset, onTes
             step="0.05"
             value={windowConfig.opacity}
             onChange={(event) => setDraft({ ...draft, window: { ...windowConfig, opacity: Number(event.target.value) } })}
+          />
+        </label>
+      </section>
+
+      <section className="settings-section">
+        <h2>聊天历史</h2>
+        <label>
+          最多保留对话
+          <input
+            type="number"
+            min="1"
+            max="100"
+            value={chatConfig.maxSessions}
+            onChange={(event) =>
+              setDraft({ ...draft, chat: { ...chatConfig, maxSessions: Number(event.target.value) } })
+            }
           />
         </label>
       </section>

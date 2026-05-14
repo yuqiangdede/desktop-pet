@@ -1,0 +1,22 @@
+{
+  "id": "luoxiaohei",
+  "name": "罗小黑",
+  "version": "0.1.0",
+  "renderMode": "image",
+  "canvas": {
+    "width": 658,
+    "height": 995
+  },
+  "image": {
+    "file": "image.png",
+    "x": -198,
+    "y": -24,
+    "width": 1024,
+    "height": 1024
+  },
+  "animation": {
+    "blink": false,
+    "headShake": false,
+    "float": false
+  }
+}

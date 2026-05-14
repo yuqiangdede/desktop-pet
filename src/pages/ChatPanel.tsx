@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { History, MessageSquarePlus, Trash2, X } from "lucide-react";
+import { History, MessageSquarePlus, Minus, Trash2 } from "lucide-react";
 import { ChatInput } from "../components/ChatInput";
 import { MessageList } from "../components/MessageList";
 import { openaiClient } from "../services/openaiClient";
@@ -82,8 +82,8 @@ export function ChatPanel() {
           <button type="button" title="清空当前聊天" disabled={loading} onClick={() => void clear()}>
             <Trash2 size={16} />
           </button>
-          <button type="button" title="隐藏聊天" onClick={() => window.desktopPet.window.toggleChat()}>
-            <X size={16} />
+          <button type="button" title="最小化聊天" onClick={() => window.desktopPet.window.toggleChat()}>
+            <Minus size={16} />
           </button>
         </div>
       </header>

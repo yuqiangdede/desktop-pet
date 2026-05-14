@@ -10,6 +10,7 @@ export function PetWindow() {
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState(false);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
+  const lastMissingCharacterReloadId = useRef<string | null>(null);
   const moved = useRef(false);
 
   useEffect(() => {
@@ -17,6 +18,17 @@ export function PetWindow() {
     load();
     loadCharacters();
   }, [load, loadCharacters, subscribeToChanges]);
+
+  useEffect(() => {
+    if (!config?.activeCharacterId) return;
+    if (characters.some((item) => item.id === config.activeCharacterId)) {
+      lastMissingCharacterReloadId.current = null;
+      return;
+    }
+    if (lastMissingCharacterReloadId.current === config.activeCharacterId) return;
+    lastMissingCharacterReloadId.current = config.activeCharacterId;
+    loadCharacters();
+  }, [characters, config?.activeCharacterId, loadCharacters]);
 
   const activeCharacter = useMemo(() => {
     return characters.find((item) => item.id === config?.activeCharacterId) ?? characters[0];

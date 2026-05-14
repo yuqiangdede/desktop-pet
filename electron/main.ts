@@ -5,7 +5,9 @@ import { createPetWindow, createTray, ensurePetWindow } from "./windowManager";
 import { getStoredConfig, registerIpc } from "./ipc";
 
 app.setName("Desktop Pet");
-protocol.registerSchemesAsPrivileged([{ scheme: "pet-asset", privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
+protocol.registerSchemesAsPrivileged([
+  { scheme: "pet-asset", privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }
+]);
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
@@ -32,10 +34,45 @@ app.whenReady().then(() => {
         return new Response("Forbidden", { status: 403 });
       }
 
-      const data = await fs.readFile(resolvedFile);
       const ext = path.extname(resolvedFile).toLowerCase();
-      const contentType = ext === ".json" ? "application/json" : ext === ".png" ? "image/png" : "application/octet-stream";
-      return new Response(data, { headers: { "content-type": contentType } });
+      const contentType =
+        ext === ".json"
+          ? "application/json"
+          : ext === ".png"
+            ? "image/png"
+            : ext === ".webm"
+              ? "video/webm"
+              : "application/octet-stream";
+      const range = request.headers.get("range");
+      if (range) {
+        const stat = await fs.stat(resolvedFile);
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (match) {
+          const start = match[1] ? Number(match[1]) : 0;
+          const end = match[2] ? Number(match[2]) : stat.size - 1;
+          if (Number.isInteger(start) && Number.isInteger(end) && start <= end && end < stat.size) {
+            const data = await fs.readFile(resolvedFile);
+            return new Response(data.subarray(start, end + 1), {
+              status: 206,
+              headers: {
+                "content-type": contentType,
+                "accept-ranges": "bytes",
+                "content-length": String(end - start + 1),
+                "content-range": `bytes ${start}-${end}/${stat.size}`
+              }
+            });
+          }
+        }
+      }
+
+      const data = await fs.readFile(resolvedFile);
+      return new Response(data, {
+        headers: {
+          "content-type": contentType,
+          "accept-ranges": "bytes",
+          "content-length": String(data.byteLength)
+        }
+      });
     } catch {
       return new Response("Not found", { status: 404 });
     }
