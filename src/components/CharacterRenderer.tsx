@@ -53,6 +53,7 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
   const animation = config.animation;
   const speedMultiplier = Math.max(0.1, animation.speedMultiplier || 1);
   const inverseSpeed = 1 / speedMultiplier;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const videoCharacter = isVideoCharacter(character.config);
   const imageCharacter = isImageCharacter(character.config);
   const isFullBodyBaseCharacter = SIMPLE_IDLE_CHARACTER_IDS.has(character.config.id);
@@ -151,6 +152,12 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
     };
   }, [idleActions, idleEnabled, idleState]);
 
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.playbackRate = speedMultiplier;
+  }, [speedMultiplier, videoCharacter, character.config.video?.file]);
+
   const idleFrameSrc = idleState ? src(idleFrameFile(idleState.action, idleState.frameIndex)) : null;
 
   if (videoCharacter && character.config.video) {
@@ -166,6 +173,7 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
           }}
         >
           <video
+            ref={videoRef}
             className="character__video"
             style={{
               left: (video.x ?? 0) * scale,
@@ -178,6 +186,11 @@ export function CharacterRenderer({ character, config }: CharacterRendererProps)
             loop
             muted
             playsInline
+            onLoadedMetadata={() => {
+              if (videoRef.current) {
+                videoRef.current.playbackRate = speedMultiplier;
+              }
+            }}
             draggable={false}
           />
         </div>
