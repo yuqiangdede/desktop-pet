@@ -9,6 +9,7 @@ import { defaultConfig, type AppConfig } from "../src/types/config";
 import type { CharacterConfig, CharacterInfo } from "../src/types/character";
 import type { ChatMessage, ChatSession } from "../src/types/chat";
 import { resolveCharacterNameFromPath } from "../src/utils/characterNaming";
+import { registerAssetRoot } from "./assetRegistry";
 import {
   createSettingsWindow,
   applyPetWindowConfig,
@@ -241,12 +242,13 @@ function readCharacterConfig(dir: string): CharacterConfig {
 
 function characterInfoFromDir(dir: string, builtin: boolean): CharacterInfo {
   const config = readCharacterConfig(dir);
-  const encodedBase = Buffer.from(path.resolve(dir), "utf-8").toString("base64url");
+  const assetKey = `${builtin ? "builtin" : "custom"}:${config.id}`;
+  registerAssetRoot(assetKey, path.resolve(dir));
   return {
     id: config.id,
     name: config.name,
-    path: dir,
-    assetBaseUrl: `pet-asset://asset/${encodedBase}`,
+    path: config.id,
+    assetBaseUrl: `pet-asset://asset/${encodeURIComponent(assetKey)}`,
     config,
     builtin
   };
@@ -278,14 +280,15 @@ function deleteImportedCharacter(id: string) {
   if (!selected) throw new Error(`找不到角色：${id}`);
   if (selected.builtin) throw new Error("内置角色不能删除");
 
+  const target = path.join(charactersDir(), id);
   const root = path.resolve(charactersDir());
-  const target = path.resolve(selected.path);
-  const relative = path.relative(root, target);
+  const resolvedTarget = path.resolve(target);
+  const relative = path.relative(root, resolvedTarget);
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("角色目录不在可删除范围内");
   }
 
-  fs.rmSync(target, { recursive: true, force: true });
+  fs.rmSync(resolvedTarget, { recursive: true, force: true });
 
   const current = readConfig();
   if (current.activeCharacterId !== id) return current;

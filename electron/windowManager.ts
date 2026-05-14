@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { pathToFileURL } from "node:url";
 import { BrowserWindow, Menu, Tray, app, nativeImage, screen } from "electron";
 import { defaultConfig, type AppConfig, type WindowConfig } from "../src/types/config";
 
@@ -13,9 +14,9 @@ let tray: Tray | null = null;
 const isDev = process.env.NODE_ENV === "development";
 
 function logDev(message: string) {
-  if (!isDev) return;
   const line = `[${new Date().toISOString()}] ${message}\n`;
-  fs.appendFileSync(path.join(app.getAppPath(), "desktop-pet-dev.log"), line, "utf-8");
+  const logPath = isDev ? path.join(app.getAppPath(), "desktop-pet-dev.log") : path.join(app.getPath("userData"), "desktop-pet.log");
+  fs.appendFileSync(logPath, line, "utf-8");
 }
 
 function preloadPath() {
@@ -26,7 +27,9 @@ function rendererUrl(name: WindowName) {
   if (isDev) {
     return `http://127.0.0.1:5173/?window=${name}`;
   }
-  return `file://${path.join(__dirname, "..", "..", "dist", "index.html")}?window=${name}`;
+  const url = pathToFileURL(path.join(__dirname, "..", "..", "dist", "index.html"));
+  url.searchParams.set("window", name);
+  return url.toString();
 }
 
 function commonWebPreferences() {
@@ -148,7 +151,15 @@ export function createChatWindow() {
     webPreferences: commonWebPreferences()
   });
 
-  chatWindow.loadURL(rendererUrl("chat"));
+  chatWindow.webContents.on("did-fail-load", (_, errorCode, errorDescription, validatedURL) => {
+    logDev(`chat did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
+  });
+  chatWindow.webContents.on("render-process-gone", (_, details) => {
+    logDev(`chat render-process-gone ${JSON.stringify(details)}`);
+  });
+  chatWindow.loadURL(rendererUrl("chat")).catch((error: Error) => {
+    logDev(`chat loadURL failed ${error.message}`);
+  });
   chatWindow.once("ready-to-show", () => {
     chatWindow?.show();
     chatWindow?.focus();
@@ -173,11 +184,24 @@ export function createSettingsWindow() {
     minHeight: 620,
     title: "Desktop Pet 设置",
     icon: appIconPath(),
+    show: false,
     backgroundColor: "#fbfaf8",
     webPreferences: commonWebPreferences()
   });
 
-  settingsWindow.loadURL(rendererUrl("settings"));
+  settingsWindow.webContents.on("did-fail-load", (_, errorCode, errorDescription, validatedURL) => {
+    logDev(`settings did-fail-load ${errorCode} ${errorDescription} ${validatedURL}`);
+  });
+  settingsWindow.webContents.on("render-process-gone", (_, details) => {
+    logDev(`settings render-process-gone ${JSON.stringify(details)}`);
+  });
+  settingsWindow.loadURL(rendererUrl("settings")).catch((error: Error) => {
+    logDev(`settings loadURL failed ${error.message}`);
+  });
+  settingsWindow.once("ready-to-show", () => {
+    settingsWindow?.show();
+    settingsWindow?.focus();
+  });
   settingsWindow.on("closed", () => {
     settingsWindow = null;
   });
