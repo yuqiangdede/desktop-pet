@@ -5,7 +5,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import { app, dialog, ipcMain, nativeImage } from "electron";
 import { PNG } from "pngjs";
-import { defaultConfig, type AppConfig } from "../src/types/config";
+import { defaultConfig, defaultModelConfig, getActiveModelConfig, type AppConfig, type ModelConfig } from "../src/types/config";
 import type { CharacterConfig, CharacterInfo } from "../src/types/character";
 import type { ChatAttachment, ChatMessage, ChatSession, ImageGenerationRequest } from "../src/types/chat";
 import { resolveCharacterNameFromPath } from "../src/utils/characterNaming";
@@ -67,6 +67,27 @@ function dataDir() {
   return app.getPath("userData");
 }
 
+type StoredAppConfig = Partial<AppConfig> & {
+  model?: Partial<ModelConfig>;
+};
+
+function logApp(message: string) {
+  const line = `[${new Date().toISOString()}] ${message}\n`;
+  const logPath =
+    process.env.NODE_ENV === "development"
+      ? path.join(app.getAppPath(), "desktop-pet-dev.log")
+      : path.join(app.getPath("userData"), "desktop-pet.log");
+  fs.appendFileSync(logPath, line, "utf-8");
+}
+
+function safeJsonSnippet(value: unknown) {
+  try {
+    return JSON.stringify(value).slice(0, 1200);
+  } catch {
+    return "[unserializable]";
+  }
+}
+
 function configPath() {
   return path.join(dataDir(), "config.json");
 }
@@ -97,20 +118,47 @@ function ensureDataDirs() {
   fs.mkdirSync(charactersDir(), { recursive: true });
 }
 
-function mergeConfig(base: AppConfig, patch: Partial<AppConfig>): AppConfig {
-  const patchModel = patch.model;
+function normalizeModelConfig(model: Partial<ModelConfig>, index: number): ModelConfig {
+  const fallbackId = index === 0 ? defaultModelConfig.id : `model-${index + 1}`;
+  const merged = {
+    ...defaultModelConfig,
+    ...model,
+    id: model.id?.trim() || fallbackId,
+    name: model.name?.trim() || model.model?.trim() || `模型 ${index + 1}`,
+    capabilities: {
+      ...defaultModelConfig.capabilities,
+      ...model.capabilities,
+      text: true
+    }
+  };
+  return merged;
+}
+
+function normalizeModels(patch: StoredAppConfig, base: AppConfig) {
+  const sourceModels = Array.isArray(patch.models) && patch.models.length ? patch.models : patch.model ? [patch.model] : base.models;
+  const seen = new Set<string>();
+  const models = sourceModels.map((model, index) => {
+    const normalized = normalizeModelConfig(model, index);
+    let id = normalized.id;
+    while (seen.has(id)) {
+      id = `${normalized.id}-${seen.size + 1}`;
+    }
+    seen.add(id);
+    return { ...normalized, id };
+  });
+  return models.length ? models : [defaultModelConfig];
+}
+
+function mergeConfig(base: AppConfig, patch: StoredAppConfig): AppConfig {
+  const models = normalizeModels(patch, base);
+  const requestedActiveModelId = patch.activeModelId ?? base.activeModelId;
+  const activeModelId = models.some((model) => model.id === requestedActiveModelId) ? requestedActiveModelId : models[0].id;
+  const { model: _legacyModel, ...patchWithoutLegacyModel } = patch;
   const merged = {
     ...base,
-    ...patch,
-    model: {
-      ...base.model,
-      ...patchModel,
-      capabilities: {
-        ...base.model.capabilities,
-        ...patchModel?.capabilities,
-        text: true
-      }
-    },
+    ...patchWithoutLegacyModel,
+    models,
+    activeModelId,
     animation: { ...base.animation, ...patch.animation },
     window: { ...base.window, ...patch.window },
     chat: { ...base.chat, ...patch.chat }
@@ -138,7 +186,7 @@ function readConfig(): AppConfig {
   }
 
   try {
-    const parsed = JSON.parse(fs.readFileSync(configPath(), "utf-8")) as Partial<AppConfig>;
+    const parsed = JSON.parse(fs.readFileSync(configPath(), "utf-8")) as StoredAppConfig;
     const merged = mergeConfig(defaultConfig, parsed);
     if (!characterIdExists(merged.activeCharacterId)) {
       return mergeConfig(merged, { activeCharacterId: "shengling-chuxue", petName: "圣聆初雪" });
@@ -720,10 +768,10 @@ function contextMessages(messages: ChatMessage[], contextRounds: number) {
   return messages;
 }
 
-function openAiPayload(config: AppConfig, messages: ChatMessage[], stream: boolean) {
-  const scopedMessages = contextMessages(messages, config.model.contextRounds);
+function openAiPayload(config: AppConfig, modelConfig: ModelConfig, messages: ChatMessage[], stream: boolean) {
+  const scopedMessages = contextMessages(messages, modelConfig.contextRounds);
   const toApiContent = (message: ChatMessage) => {
-    if (!message.attachments?.length) return message.content;
+    if (!modelConfig.capabilities.vision || !message.attachments?.length) return message.content;
     return [
       { type: "text", text: message.content },
       ...message.attachments.map((attachment) => ({
@@ -735,20 +783,20 @@ function openAiPayload(config: AppConfig, messages: ChatMessage[], stream: boole
     ];
   };
   const apiMessages = [
-    ...(config.model.systemPrompt.trim()
-      ? [{ role: "system", content: config.model.systemPrompt.trim() }]
+    ...(modelConfig.systemPrompt.trim()
+      ? [{ role: "system", content: modelConfig.systemPrompt.trim() }]
       : []),
     ...scopedMessages.map((message) => ({ role: message.role, content: toApiContent(message) }))
   ];
 
   const payload = {
-    model: config.model.model,
+    model: modelConfig.model,
     messages: apiMessages,
-    temperature: config.model.temperature,
+    temperature: modelConfig.temperature,
     stream
   };
-  if (config.model.max_tokens > 0) {
-    return { ...payload, max_tokens: config.model.max_tokens };
+  if (modelConfig.max_tokens > 0) {
+    return { ...payload, max_tokens: modelConfig.max_tokens };
   }
   return payload;
 }
@@ -779,30 +827,31 @@ function imageGenerationPayload(request: ImageGenerationRequest, model: string) 
 
 async function requestChat(messages: ChatMessage[], requestId: string) {
   const config = readConfig();
-  if (!config.model.apiKey.trim()) {
+  const modelConfig = getActiveModelConfig(config);
+  if (!modelConfig.apiKey.trim()) {
     throw new Error("请先在设置中填写 API Key");
   }
-  if (!config.model.apiBaseUrl.trim()) {
+  if (!modelConfig.apiBaseUrl.trim()) {
     throw new Error("请先在设置中填写 API Base URL");
   }
 
   const controller = new AbortController();
   abortControllers.set(requestId, controller);
-  const response = await fetch(`${normalizeBaseUrl(config.model.apiBaseUrl)}/chat/completions`, {
+  const response = await fetch(`${normalizeBaseUrl(modelConfig.apiBaseUrl)}/chat/completions`, {
     method: "POST",
     signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.model.apiKey}`
+      Authorization: `Bearer ${modelConfig.apiKey}`
     },
-    body: JSON.stringify(openAiPayload(config, messages, config.model.stream))
+    body: JSON.stringify(openAiPayload(config, modelConfig, messages, modelConfig.stream))
   });
 
   if (!response.ok) {
     throw new Error(parseOpenAiError(await response.text(), response.status));
   }
 
-  if (!config.model.stream) {
+  if (!modelConfig.stream) {
     const json = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
     const content = json.choices?.[0]?.message?.content ?? "";
     sendToChat("chat:done", { requestId, content });
@@ -852,9 +901,10 @@ async function requestChat(messages: ChatMessage[], requestId: string) {
 
 async function requestImageGeneration(request: ImageGenerationRequest, requestId: string) {
   const config = readConfig();
+  const modelConfig = getActiveModelConfig(config);
   const prompt = request.prompt.trim();
-  const model = config.model.model.trim();
-  if (!config.model.capabilities.image) {
+  const model = modelConfig.model.trim();
+  if (!modelConfig.capabilities.image) {
     throw new Error("请先在设置中启用生图能力");
   }
   if (!prompt) {
@@ -863,27 +913,32 @@ async function requestImageGeneration(request: ImageGenerationRequest, requestId
   if (!model) {
     throw new Error("请先在设置中填写 Model");
   }
-  if (!config.model.apiKey.trim()) {
+  if (!modelConfig.apiKey.trim()) {
     throw new Error("请先在设置中填写 API Key");
   }
-  if (!config.model.apiBaseUrl.trim()) {
+  if (!modelConfig.apiBaseUrl.trim()) {
     throw new Error("请先在设置中填写 API Base URL");
   }
 
   const controller = new AbortController();
   abortControllers.set(requestId, controller);
-  const response = await fetch(`${normalizeBaseUrl(config.model.apiBaseUrl)}/images/generate`, {
+  const url = `${normalizeBaseUrl(modelConfig.apiBaseUrl)}/images/generations`;
+  const payload = imageGenerationPayload({ ...request, prompt }, model);
+  logApp(`image request ${requestId} POST ${url} model=${model} size=${request.size} n=${payload.n}`);
+  const response = await fetch(url, {
     method: "POST",
     signal: controller.signal,
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${config.model.apiKey}`
+      Authorization: `Bearer ${modelConfig.apiKey}`
     },
-    body: JSON.stringify(imageGenerationPayload({ ...request, prompt }, model))
+    body: JSON.stringify(payload)
   });
 
   if (!response.ok) {
-    throw new Error(parseOpenAiError(await response.text(), response.status));
+    const body = await response.text();
+    logApp(`image response ${requestId} HTTP ${response.status} ${safeJsonSnippet(body)}`);
+    throw new Error(parseOpenAiError(body, response.status));
   }
 
   const json = (await response.json()) as { data?: Array<{ b64_json?: string }> };
@@ -902,15 +957,17 @@ async function requestImageGeneration(request: ImageGenerationRequest, requestId
     .filter((item): item is ChatAttachment => Boolean(item));
 
   if (!attachments.length) {
+    logApp(`image response ${requestId} no image data ${safeJsonSnippet(json)}`);
     throw new Error("生图接口未返回图片数据");
   }
 
+  logApp(`image response ${requestId} success images=${attachments.length}`);
   sendToChat("chat:done", { requestId, content: `已生成 ${attachments.length} 张图片。`, attachments });
 }
 
 export function registerIpc() {
   ipcMain.handle("config:get", () => readConfig());
-  ipcMain.handle("config:save", (_, patch: Partial<AppConfig>) => {
+  ipcMain.handle("config:save", (_, patch: StoredAppConfig) => {
     const next = mergeConfig(readConfig(), patch);
     writeConfig(next);
     trimStoredChatSessions(next.chat.maxSessions);
@@ -1020,19 +1077,20 @@ export function registerIpc() {
   ipcMain.handle("chat:listSessions", () => readChatSessions());
   ipcMain.handle("chat:saveSessions", (_, sessions: ChatSession[]) => writeChatSessions(sessions));
 
-  ipcMain.handle("chat:testConnection", async (_, patch?: Partial<AppConfig>) => {
+  ipcMain.handle("chat:testConnection", async (_, patch?: StoredAppConfig) => {
     try {
       const config = mergeConfig(readConfig(), patch ?? {});
-      if (!config.model.apiKey.trim()) throw new Error("请先在设置中填写 API Key");
-      if (!config.model.apiBaseUrl.trim()) throw new Error("请先在设置中填写 API Base URL");
-      const response = await fetch(`${normalizeBaseUrl(config.model.apiBaseUrl)}/chat/completions`, {
+      const modelConfig = getActiveModelConfig(config);
+      if (!modelConfig.apiKey.trim()) throw new Error("请先在设置中填写 API Key");
+      if (!modelConfig.apiBaseUrl.trim()) throw new Error("请先在设置中填写 API Base URL");
+      const response = await fetch(`${normalizeBaseUrl(modelConfig.apiBaseUrl)}/chat/completions`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${config.model.apiKey}`
+          Authorization: `Bearer ${modelConfig.apiKey}`
         },
         body: JSON.stringify({
-          ...openAiPayload(config, [{ id: "test", role: "user", content: "ping", createdAt: Date.now() }], false),
+          ...openAiPayload(config, modelConfig, [{ id: "test", role: "user", content: "ping", createdAt: Date.now() }], false),
           max_tokens: 1,
           stream: false
         })
@@ -1040,7 +1098,7 @@ export function registerIpc() {
       if (!response.ok) {
         throw new Error(parseOpenAiError(await response.text(), response.status));
       }
-      return { ok: true, message: `连接成功：${config.model.model}` };
+      return { ok: true, message: `连接成功：${modelConfig.name || modelConfig.model}` };
     } catch (error) {
       return { ok: false, message: error instanceof Error ? error.message : "测试连接失败" };
     }

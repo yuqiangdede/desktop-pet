@@ -179,9 +179,9 @@ export function createSettingsWindow() {
 
   settingsWindow = new BrowserWindow({
     width: 920,
-    height: 720,
+    height: 820,
     minWidth: 760,
-    minHeight: 620,
+    minHeight: 720,
     title: "Desktop Pet 设置",
     icon: appIconPath(),
     show: false,

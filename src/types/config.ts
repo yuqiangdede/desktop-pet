@@ -1,4 +1,6 @@
 export interface ModelConfig {
+  id: string;
+  name: string;
   apiBaseUrl: string;
   apiKey: string;
   model: string;
@@ -36,29 +38,30 @@ export interface ChatConfig {
 
 export interface AppConfig {
   petName: string;
-  model: ModelConfig;
+  models: ModelConfig[];
+  activeModelId: string;
   animation: AnimationConfig;
   window: WindowConfig;
   chat: ChatConfig;
   activeCharacterId: string;
 }
 
-export const defaultConfig: AppConfig = {
-  petName: "圣聆初雪",
-  model: {
-    apiBaseUrl: "https://api.openai.com/v1",
-    apiKey: "",
-    model: "gpt-4o-mini",
-    capabilities: {
-      text: true,
-      vision: false,
-      image: false
-    },
-    temperature: 0.7,
-    max_tokens: 0,
-    contextRounds: 6,
-    stream: true,
-    systemPrompt: `你是一个中文桌面助手，主要是Java开发者、运维人员、系统安全负责人。
+export const defaultModelConfig: ModelConfig = {
+  id: "default-model",
+  name: "默认模型",
+  apiBaseUrl: "https://api.openai.com/v1",
+  apiKey: "",
+  model: "gpt-4o-mini",
+  capabilities: {
+    text: true,
+    vision: false,
+    image: false
+  },
+  temperature: 0.7,
+  max_tokens: 0,
+  contextRounds: 6,
+  stream: true,
+  systemPrompt: `你是一个中文桌面助手，主要是Java开发者、运维人员、系统安全负责人。
 
 回答要求：
 
@@ -99,7 +102,16 @@ export const defaultConfig: AppConfig = {
 - 不输出没有落地价值的内容
 
 当用户要求生成代码、SQL、配置、脚本、提示词或方案时，优先输出可直接复制使用的版本。`
-  },
+};
+
+export function getActiveModelConfig(config: AppConfig) {
+  return config.models.find((model) => model.id === config.activeModelId) ?? config.models[0] ?? defaultModelConfig;
+}
+
+export const defaultConfig: AppConfig = {
+  petName: "圣聆初雪",
+  models: [defaultModelConfig],
+  activeModelId: defaultModelConfig.id,
   animation: {
     blink: true,
     headShake: true,

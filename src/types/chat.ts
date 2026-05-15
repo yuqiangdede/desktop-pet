@@ -13,6 +13,7 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   createdAt: number;
+  modelName?: string;
   attachments?: ChatAttachment[];
   error?: string;
 }

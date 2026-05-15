@@ -1,6 +1,6 @@
-import { Film, Image, RotateCcw, Save, TestTube2, Trash2 } from "lucide-react";
+import { Copy, Film, Image, Plus, RotateCcw, Save, TestTube2, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { AppConfig } from "../types/config";
+import { defaultModelConfig, getActiveModelConfig, type AppConfig, type ModelConfig } from "../types/config";
 import type { CharacterInfo } from "../types/character";
 
 interface SettingFormProps {
@@ -34,7 +34,7 @@ export function SettingForm({
     setDraft(config);
   }, [config]);
 
-  const model = draft.model;
+  const model = getActiveModelConfig(draft);
   const capabilities = model.capabilities;
   const windowConfig = draft.window;
   const chatConfig = draft.chat;
@@ -45,16 +45,89 @@ export function SettingForm({
     setDraft({ ...draft, activeCharacterId: id, petName: selected?.config.name ?? draft.petName });
     onCharacterChange(id);
   };
+  const updateActiveModel = (patch: Partial<ModelConfig>) => {
+    setDraft({
+      ...draft,
+      models: draft.models.map((item) =>
+        item.id === model.id
+          ? {
+              ...item,
+              ...patch,
+              capabilities: { ...item.capabilities, ...patch.capabilities, text: true }
+            }
+          : item
+      )
+    });
+  };
+  const selectModel = (id: string) => {
+    setDraft({ ...draft, activeModelId: id });
+  };
+  const createModel = () => {
+    const id = crypto.randomUUID();
+    const nextModel = {
+      ...defaultModelConfig,
+      id,
+      name: `模型 ${draft.models.length + 1}`
+    };
+    setDraft({ ...draft, models: [...draft.models, nextModel], activeModelId: id });
+  };
+  const duplicateModel = () => {
+    const id = crypto.randomUUID();
+    const nextModel = {
+      ...model,
+      id,
+      name: `${model.name || model.model || "模型"} 副本`
+    };
+    setDraft({ ...draft, models: [...draft.models, nextModel], activeModelId: id });
+  };
+  const deleteModel = () => {
+    if (draft.models.length <= 1) return;
+    const nextModels = draft.models.filter((item) => item.id !== model.id);
+    setDraft({ ...draft, models: nextModels, activeModelId: nextModels[0].id });
+  };
 
   return (
     <div className="settings-layout">
       <section className="settings-section settings-section--model">
         <h2>模型接口</h2>
+        <div className="model-toolbar">
+          <label>
+            当前模型
+            <select value={model.id} onChange={(event) => selectModel(event.target.value)}>
+              {draft.models.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name || item.model || "未命名模型"}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="model-toolbar__actions">
+            <button type="button" className="secondary-button" title="新增模型" onClick={createModel}>
+              <Plus size={16} />
+            </button>
+            <button type="button" className="secondary-button" title="复制当前模型" onClick={duplicateModel}>
+              <Copy size={16} />
+            </button>
+            <button
+              type="button"
+              className="danger-button"
+              title="删除当前模型"
+              disabled={draft.models.length <= 1}
+              onClick={deleteModel}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+        <label>
+          显示名称
+          <input value={model.name} onChange={(event) => updateActiveModel({ name: event.target.value })} placeholder="例如：主力模型" />
+        </label>
         <label>
           API Base URL
           <input
             value={model.apiBaseUrl}
-            onChange={(event) => setDraft({ ...draft, model: { ...model, apiBaseUrl: event.target.value } })}
+            onChange={(event) => updateActiveModel({ apiBaseUrl: event.target.value })}
             placeholder="https://api.openai.com/v1"
           />
         </label>
@@ -63,14 +136,14 @@ export function SettingForm({
           <input
             type="password"
             value={model.apiKey}
-            onChange={(event) => setDraft({ ...draft, model: { ...model, apiKey: event.target.value } })}
+            onChange={(event) => updateActiveModel({ apiKey: event.target.value })}
             placeholder="sk-..."
           />
         </label>
         <div className="model-capability-row">
           <label>
             Model
-            <input value={model.model} onChange={(event) => setDraft({ ...draft, model: { ...model, model: event.target.value } })} />
+            <input value={model.model} onChange={(event) => updateActiveModel({ model: event.target.value })} />
           </label>
           <div className="model-capabilities" aria-label="模型能力">
             <button type="button" className="model-capability model-capability--active" disabled title="文本能力始终启用">
@@ -80,13 +153,7 @@ export function SettingForm({
               type="button"
               className={capabilities.vision ? "model-capability model-capability--active" : "model-capability"}
               onClick={() =>
-                setDraft({
-                  ...draft,
-                  model: {
-                    ...model,
-                    capabilities: { ...capabilities, text: true, vision: !capabilities.vision }
-                  }
-                })
+                updateActiveModel({ capabilities: { ...capabilities, text: true, vision: !capabilities.vision } })
               }
             >
               识图
@@ -95,13 +162,7 @@ export function SettingForm({
               type="button"
               className={capabilities.image ? "model-capability model-capability--active" : "model-capability"}
               onClick={() =>
-                setDraft({
-                  ...draft,
-                  model: {
-                    ...model,
-                    capabilities: { ...capabilities, text: true, image: !capabilities.image }
-                  }
-                })
+                updateActiveModel({ capabilities: { ...capabilities, text: true, image: !capabilities.image } })
               }
             >
               生图
@@ -117,7 +178,7 @@ export function SettingForm({
               max="2"
               step="0.1"
               value={model.temperature}
-              onChange={(event) => setDraft({ ...draft, model: { ...model, temperature: Number(event.target.value) } })}
+              onChange={(event) => updateActiveModel({ temperature: Number(event.target.value) })}
             />
           </label>
           <label>
@@ -127,7 +188,7 @@ export function SettingForm({
               min="0"
               max="8192"
               value={model.max_tokens}
-              onChange={(event) => setDraft({ ...draft, model: { ...model, max_tokens: Number(event.target.value) } })}
+              onChange={(event) => updateActiveModel({ max_tokens: Number(event.target.value) })}
             />
           </label>
         </div>
@@ -139,7 +200,7 @@ export function SettingForm({
               min="0"
               max="50"
               value={model.contextRounds}
-              onChange={(event) => setDraft({ ...draft, model: { ...model, contextRounds: Number(event.target.value) } })}
+              onChange={(event) => updateActiveModel({ contextRounds: Number(event.target.value) })}
             />
           </label>
           <label>
@@ -160,7 +221,7 @@ export function SettingForm({
             <input
               type="checkbox"
               checked={model.stream}
-              onChange={(event) => setDraft({ ...draft, model: { ...model, stream: event.target.checked } })}
+              onChange={(event) => updateActiveModel({ stream: event.target.checked })}
             />
             Stream 流式输出
           </label>
@@ -170,7 +231,7 @@ export function SettingForm({
           <textarea
             rows={4}
             value={model.systemPrompt}
-            onChange={(event) => setDraft({ ...draft, model: { ...model, systemPrompt: event.target.value } })}
+            onChange={(event) => updateActiveModel({ systemPrompt: event.target.value })}
           />
         </label>
       </section>

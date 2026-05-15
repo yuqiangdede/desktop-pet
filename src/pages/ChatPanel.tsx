@@ -5,6 +5,7 @@ import { MessageList } from "../components/MessageList";
 import { openaiClient } from "../services/openaiClient";
 import { useChatStore } from "../store/chatStore";
 import { useConfigStore } from "../store/configStore";
+import { getActiveModelConfig } from "../types/config";
 
 function formatSessionTime(value: number) {
   return new Intl.DateTimeFormat("zh-CN", {
@@ -28,12 +29,13 @@ export function ChatPanel() {
     deleteSession,
     sendMessage,
     generateImage,
+    retryMessage,
     appendDelta,
     finishMessage,
     failMessage,
     clear
   } = useChatStore();
-  const { config, load, subscribeToChanges } = useConfigStore();
+  const { config, load, save, subscribeToChanges } = useConfigStore();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [inputError, setInputError] = useState<string | null>(null);
 
@@ -59,9 +61,10 @@ export function ChatPanel() {
     [activeSessionId, sessions]
   );
   const assistantName = config?.petName.trim() || "桌宠";
-  const modelName = config?.model.model.trim() || "未配置模型";
-  const visionEnabled = Boolean(config?.model.capabilities.vision);
-  const imageGenerationEnabled = Boolean(config?.model.capabilities.image);
+  const activeModel = config ? getActiveModelConfig(config) : null;
+  const modelName = activeModel?.name.trim() || activeModel?.model.trim() || "未配置模型";
+  const visionEnabled = Boolean(activeModel?.capabilities.vision);
+  const imageGenerationEnabled = Boolean(activeModel?.capabilities.image);
   const visibleError = inputError || error;
 
   return (
@@ -69,7 +72,23 @@ export function ChatPanel() {
       <header className="panel-header">
         <div>
           <h1>聊天</h1>
-          <p>{loading ? "正在回复" : modelName}</p>
+          {config && config.models.length > 1 ? (
+            <select
+              className="model-switch"
+              value={activeModel?.id ?? config.activeModelId}
+              disabled={loading || Boolean(activeRequestId)}
+              title="切换模型"
+              onChange={(event) => void save({ activeModelId: event.target.value })}
+            >
+              {config.models.map((model) => (
+                <option key={model.id} value={model.id}>
+                  {model.name || model.model || "未命名模型"}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <p>{loading ? "正在回复" : modelName}</p>
+          )}
         </div>
         <div className="header-actions">
           <button
@@ -128,7 +147,15 @@ export function ChatPanel() {
 
       <section className="chat-content">
         {visibleError && <div className="error-banner">{visibleError}</div>}
-        <MessageList messages={activeSession?.messages ?? []} assistantName={assistantName} />
+        <MessageList
+          messages={activeSession?.messages ?? []}
+          assistantName={assistantName}
+          retrying={loading || Boolean(activeRequestId)}
+          onRetry={(messageId) => {
+            setInputError(null);
+            void retryMessage(messageId, modelName);
+          }}
+        />
       </section>
       <ChatInput
         disabled={loading || Boolean(activeRequestId)}
@@ -136,11 +163,11 @@ export function ChatPanel() {
         imageGenerationEnabled={imageGenerationEnabled}
         onSend={(content, attachments) => {
           setInputError(null);
-          void sendMessage(content, attachments);
+          void sendMessage(content, attachments, modelName);
         }}
         onGenerateImage={(request) => {
           setInputError(null);
-          void generateImage(request);
+          void generateImage(request, modelName);
         }}
         onError={setInputError}
       />

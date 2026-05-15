@@ -12,8 +12,9 @@ interface ChatState {
   createSession: () => void;
   selectSession: (id: string) => void;
   deleteSession: (id: string) => Promise<void>;
-  sendMessage: (content: string, attachments?: ChatAttachment[]) => Promise<void>;
-  generateImage: (request: ImageGenerationRequest) => Promise<void>;
+  sendMessage: (content: string, attachments?: ChatAttachment[], modelName?: string) => Promise<void>;
+  generateImage: (request: ImageGenerationRequest, modelName?: string) => Promise<void>;
+  retryMessage: (messageId: string, modelName?: string) => Promise<void>;
   appendDelta: (requestId: string, delta: string) => void;
   finishMessage: (requestId: string, content: string, attachments?: ChatAttachment[]) => void;
   failMessage: (requestId: string, message: string) => void;
@@ -24,11 +25,12 @@ function now() {
   return Date.now();
 }
 
-function newMessage(role: ChatMessage["role"], content: string, attachments?: ChatAttachment[]): ChatMessage {
+function newMessage(role: ChatMessage["role"], content: string, attachments?: ChatAttachment[], modelName?: string): ChatMessage {
   return {
     id: crypto.randomUUID(),
     role,
     content,
+    ...(modelName ? { modelName } : {}),
     ...(attachments?.length ? { attachments } : {}),
     createdAt: now()
   };
@@ -115,13 +117,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
     const saved = await persist(sessions);
     set({ sessions: saved, activeSessionId: nextActiveSessionId(saved, activeSessionId) });
   },
-  sendMessage: async (content, attachments = []) => {
+  sendMessage: async (content, attachments = [], modelName) => {
     const trimmed = content.trim();
     if (!trimmed && !attachments.length) return;
     const current = activeSession(get()) ?? newSession();
     const userContent = trimmed || "请识别并描述这些图片。";
     const user = newMessage("user", userContent, attachments);
-    const assistant = newMessage("assistant", "");
+    const assistant = newMessage("assistant", "", undefined, modelName);
     const nextSession: ChatSession = {
       ...current,
       title: sessionTitle([...current.messages, user]),
@@ -140,7 +142,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       get().failMessage(assistant.id, error instanceof Error ? error.message : "发送消息失败");
     }
   },
-  generateImage: async (request) => {
+  generateImage: async (request, modelName) => {
     const prompt = request.prompt.trim();
     if (!prompt) {
       set({ error: "请输入 Prompt" });
@@ -148,7 +150,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
     const current = activeSession(get()) ?? newSession();
     const user = newMessage("user", `生成图片：${prompt}`);
-    const assistant = newMessage("assistant", "");
+    const assistant = newMessage("assistant", "", undefined, modelName);
     const nextSession: ChatSession = {
       ...current,
       title: sessionTitle([...current.messages, user]),
@@ -164,6 +166,34 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({ activeRequestId: requestId });
     } catch (error) {
       get().failMessage(assistant.id, error instanceof Error ? error.message : "图像生成失败");
+    }
+  },
+  retryMessage: async (messageId, modelName) => {
+    if (get().loading) return;
+    const current = activeSession(get());
+    if (!current) return;
+    const targetIndex = current.messages.findIndex((message) => message.id === messageId && message.role === "assistant");
+    if (targetIndex <= 0) return;
+    const previousMessages = current.messages.slice(0, targetIndex);
+    if (!previousMessages.some((message) => message.role === "user")) return;
+    const assistant = newMessage("assistant", "", undefined, modelName);
+    const nextMessages = [...previousMessages, assistant];
+    const nextSession: ChatSession = {
+      ...current,
+      title: sessionTitle(nextMessages),
+      messages: nextMessages,
+      updatedAt: now()
+    };
+    const sessions = sortSessions([nextSession, ...get().sessions.filter((session) => session.id !== nextSession.id)]);
+    set({ sessions, activeSessionId: nextSession.id, loading: true, activeRequestId: null, error: null });
+    const saved = await persist(sessions);
+    set({ sessions: saved, activeSessionId: nextActiveSessionId(saved, nextSession.id) });
+    try {
+      const messagesForApi = previousMessages.filter((message) => message.role !== "assistant" || message.content);
+      const { requestId } = await chatService.send(messagesForApi);
+      set({ activeRequestId: requestId });
+    } catch (error) {
+      get().failMessage(assistant.id, error instanceof Error ? error.message : "重试失败");
     }
   },
   appendDelta: (requestId, delta) => {
