@@ -27,6 +27,7 @@ export function ChatPanel() {
     selectSession,
     deleteSession,
     sendMessage,
+    generateImage,
     appendDelta,
     finishMessage,
     failMessage,
@@ -44,7 +45,7 @@ export function ChatPanel() {
 
   useEffect(() => {
     const offDelta = openaiClient.onDelta(({ requestId, delta }) => appendDelta(requestId, delta));
-    const offDone = openaiClient.onDone(({ requestId, content }) => finishMessage(requestId, content));
+    const offDone = openaiClient.onDone(({ requestId, content, attachments }) => finishMessage(requestId, content, attachments));
     const offError = openaiClient.onError(({ requestId, message }) => failMessage(requestId, message));
     return () => {
       offDelta();
@@ -59,6 +60,8 @@ export function ChatPanel() {
   );
   const assistantName = config?.petName.trim() || "桌宠";
   const modelName = config?.model.model.trim() || "未配置模型";
+  const visionEnabled = Boolean(config?.model.capabilities.vision);
+  const imageGenerationEnabled = Boolean(config?.model.capabilities.image);
   const visibleError = inputError || error;
 
   return (
@@ -129,9 +132,15 @@ export function ChatPanel() {
       </section>
       <ChatInput
         disabled={loading || Boolean(activeRequestId)}
-        onSend={(content) => {
+        visionEnabled={visionEnabled}
+        imageGenerationEnabled={imageGenerationEnabled}
+        onSend={(content, attachments) => {
           setInputError(null);
-          void sendMessage(content);
+          void sendMessage(content, attachments);
+        }}
+        onGenerateImage={(request) => {
+          setInputError(null);
+          void generateImage(request);
         }}
         onError={setInputError}
       />

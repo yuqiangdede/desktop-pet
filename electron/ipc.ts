@@ -7,7 +7,7 @@ import { app, dialog, ipcMain, nativeImage } from "electron";
 import { PNG } from "pngjs";
 import { defaultConfig, type AppConfig } from "../src/types/config";
 import type { CharacterConfig, CharacterInfo } from "../src/types/character";
-import type { ChatMessage, ChatSession } from "../src/types/chat";
+import type { ChatAttachment, ChatMessage, ChatSession, ImageGenerationRequest } from "../src/types/chat";
 import { resolveCharacterNameFromPath } from "../src/utils/characterNaming";
 import { registerAssetRoot } from "./assetRegistry";
 import {
@@ -98,10 +98,19 @@ function ensureDataDirs() {
 }
 
 function mergeConfig(base: AppConfig, patch: Partial<AppConfig>): AppConfig {
+  const patchModel = patch.model;
   const merged = {
     ...base,
     ...patch,
-    model: { ...base.model, ...patch.model },
+    model: {
+      ...base.model,
+      ...patchModel,
+      capabilities: {
+        ...base.model.capabilities,
+        ...patchModel?.capabilities,
+        text: true
+      }
+    },
     animation: { ...base.animation, ...patch.animation },
     window: { ...base.window, ...patch.window },
     chat: { ...base.chat, ...patch.chat }
@@ -713,11 +722,23 @@ function contextMessages(messages: ChatMessage[], contextRounds: number) {
 
 function openAiPayload(config: AppConfig, messages: ChatMessage[], stream: boolean) {
   const scopedMessages = contextMessages(messages, config.model.contextRounds);
+  const toApiContent = (message: ChatMessage) => {
+    if (!message.attachments?.length) return message.content;
+    return [
+      { type: "text", text: message.content },
+      ...message.attachments.map((attachment) => ({
+        type: "image_url",
+        image_url: {
+          url: attachment.dataUrl
+        }
+      }))
+    ];
+  };
   const apiMessages = [
     ...(config.model.systemPrompt.trim()
       ? [{ role: "system", content: config.model.systemPrompt.trim() }]
       : []),
-    ...scopedMessages.map((message) => ({ role: message.role, content: message.content }))
+    ...scopedMessages.map((message) => ({ role: message.role, content: toApiContent(message) }))
   ];
 
   const payload = {
@@ -739,6 +760,21 @@ function parseOpenAiError(body: string, status: number) {
   } catch {
     return body || `请求失败，HTTP ${status}`;
   }
+}
+
+function imageGenerationPayload(request: ImageGenerationRequest, model: string) {
+  const prompt = request.prompt.trim();
+  const negativePrompt = request.negativePrompt?.trim() ?? "";
+  const count = Math.min(4, Math.max(1, Math.floor(Number(request.n) || 1)));
+  const payload = {
+    model,
+    prompt,
+    n: count,
+    size: request.size,
+    response_format: "b64_json",
+    kwargs: JSON.stringify({ negative_prompt: negativePrompt })
+  };
+  return payload;
 }
 
 async function requestChat(messages: ChatMessage[], requestId: string) {
@@ -812,6 +848,64 @@ async function requestChat(messages: ChatMessage[], requestId: string) {
   }
 
   sendToChat("chat:done", { requestId, content: full });
+}
+
+async function requestImageGeneration(request: ImageGenerationRequest, requestId: string) {
+  const config = readConfig();
+  const prompt = request.prompt.trim();
+  const model = config.model.model.trim();
+  if (!config.model.capabilities.image) {
+    throw new Error("请先在设置中启用生图能力");
+  }
+  if (!prompt) {
+    throw new Error("请输入 Prompt");
+  }
+  if (!model) {
+    throw new Error("请先在设置中填写 Model");
+  }
+  if (!config.model.apiKey.trim()) {
+    throw new Error("请先在设置中填写 API Key");
+  }
+  if (!config.model.apiBaseUrl.trim()) {
+    throw new Error("请先在设置中填写 API Base URL");
+  }
+
+  const controller = new AbortController();
+  abortControllers.set(requestId, controller);
+  const response = await fetch(`${normalizeBaseUrl(config.model.apiBaseUrl)}/images/generate`, {
+    method: "POST",
+    signal: controller.signal,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.model.apiKey}`
+    },
+    body: JSON.stringify(imageGenerationPayload({ ...request, prompt }, model))
+  });
+
+  if (!response.ok) {
+    throw new Error(parseOpenAiError(await response.text(), response.status));
+  }
+
+  const json = (await response.json()) as { data?: Array<{ b64_json?: string }> };
+  const attachments = (json.data ?? [])
+    .map((item, index): ChatAttachment | null => {
+      const b64 = item.b64_json?.trim();
+      if (!b64) return null;
+      return {
+        id: crypto.randomUUID().toString(),
+        name: `qwen-image-${index + 1}.png`,
+        mimeType: "image/png",
+        size: Math.floor((b64.length * 3) / 4),
+        dataUrl: `data:image/png;base64,${b64}`
+      };
+    })
+    .filter((item): item is ChatAttachment => Boolean(item));
+
+  if (!attachments.length) {
+    throw new Error("生图接口未返回图片数据");
+  }
+
+  sendToChat("chat:done", { requestId, content: `已生成 ${attachments.length} 张图片。`, attachments });
 }
 
 export function registerIpc() {
@@ -900,6 +994,17 @@ export function registerIpc() {
     const requestId = crypto.randomUUID();
     requestChat(messages, requestId).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : "聊天请求失败";
+      sendToChat("chat:error", { requestId, message });
+    }).finally(() => {
+      abortControllers.delete(requestId);
+    });
+    return { requestId };
+  });
+
+  ipcMain.handle("chat:generateImage", async (_, request: ImageGenerationRequest) => {
+    const requestId = crypto.randomUUID();
+    requestImageGeneration(request, requestId).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : "图像生成失败";
       sendToChat("chat:error", { requestId, message });
     }).finally(() => {
       abortControllers.delete(requestId);

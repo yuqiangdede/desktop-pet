@@ -2,6 +2,11 @@ export interface ModelConfig {
   apiBaseUrl: string;
   apiKey: string;
   model: string;
+  capabilities: {
+    text: boolean;
+    vision: boolean;
+    image: boolean;
+  };
   temperature: number;
   max_tokens: number;
   contextRounds: number;
@@ -44,6 +49,11 @@ export const defaultConfig: AppConfig = {
     apiBaseUrl: "https://api.openai.com/v1",
     apiKey: "",
     model: "gpt-4o-mini",
+    capabilities: {
+      text: true,
+      vision: false,
+      image: false
+    },
     temperature: 0.7,
     max_tokens: 0,
     contextRounds: 6,

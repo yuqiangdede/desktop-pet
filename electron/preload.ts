@@ -17,6 +17,7 @@ const api: DesktopPetApi = {
   },
   chat: {
     send: (messages) => ipcRenderer.invoke("chat:send", messages),
+    generateImage: (request) => ipcRenderer.invoke("chat:generateImage", request),
     stop: (requestId) => ipcRenderer.invoke("chat:stop", requestId),
     listSessions: () => ipcRenderer.invoke("chat:listSessions"),
     saveSessions: (sessions) => ipcRenderer.invoke("chat:saveSessions", sessions),

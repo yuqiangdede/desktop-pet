@@ -35,6 +35,7 @@ export function SettingForm({
   }, [config]);
 
   const model = draft.model;
+  const capabilities = model.capabilities;
   const windowConfig = draft.window;
   const chatConfig = draft.chat;
   const selectedCharacter = characters.find((character) => character.id === draft.activeCharacterId);
@@ -66,10 +67,47 @@ export function SettingForm({
             placeholder="sk-..."
           />
         </label>
-        <label>
-          Model
-          <input value={model.model} onChange={(event) => setDraft({ ...draft, model: { ...model, model: event.target.value } })} />
-        </label>
+        <div className="model-capability-row">
+          <label>
+            Model
+            <input value={model.model} onChange={(event) => setDraft({ ...draft, model: { ...model, model: event.target.value } })} />
+          </label>
+          <div className="model-capabilities" aria-label="模型能力">
+            <button type="button" className="model-capability model-capability--active" disabled title="文本能力始终启用">
+              文本
+            </button>
+            <button
+              type="button"
+              className={capabilities.vision ? "model-capability model-capability--active" : "model-capability"}
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  model: {
+                    ...model,
+                    capabilities: { ...capabilities, text: true, vision: !capabilities.vision }
+                  }
+                })
+              }
+            >
+              识图
+            </button>
+            <button
+              type="button"
+              className={capabilities.image ? "model-capability model-capability--active" : "model-capability"}
+              onClick={() =>
+                setDraft({
+                  ...draft,
+                  model: {
+                    ...model,
+                    capabilities: { ...capabilities, text: true, image: !capabilities.image }
+                  }
+                })
+              }
+            >
+              生图
+            </button>
+          </div>
+        </div>
         <div className="form-grid">
           <label>
             Temperature
@@ -127,7 +165,7 @@ export function SettingForm({
             Stream 流式输出
           </label>
         </div>
-        <label>
+        <label className="system-prompt-field">
           System Prompt
           <textarea
             rows={4}

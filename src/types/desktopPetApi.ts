@@ -1,6 +1,6 @@
 import type { AppConfig } from "./config";
 import type { CharacterInfo } from "./character";
-import type { ChatDelta, ChatDone, ChatError, ChatMessage, ChatSession } from "./chat";
+import type { ChatDelta, ChatDone, ChatError, ChatMessage, ChatSession, ImageGenerationRequest } from "./chat";
 
 export interface DesktopPetApi {
   config: {
@@ -11,6 +11,7 @@ export interface DesktopPetApi {
   };
   chat: {
     send(messages: ChatMessage[]): Promise<{ requestId: string }>;
+    generateImage(request: ImageGenerationRequest): Promise<{ requestId: string }>;
     stop(requestId: string): Promise<void>;
     listSessions(): Promise<ChatSession[]>;
     saveSessions(sessions: ChatSession[]): Promise<ChatSession[]>;
