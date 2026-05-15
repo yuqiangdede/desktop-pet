@@ -144,7 +144,6 @@ export function createChatWindow() {
     resizable: true,
     minWidth: 340,
     minHeight: 460,
-    alwaysOnTop: true,
     skipTaskbar: true,
     icon: appIconPath(),
     backgroundColor: "#f6f1ec",
@@ -156,6 +155,15 @@ export function createChatWindow() {
   });
   chatWindow.webContents.on("render-process-gone", (_, details) => {
     logDev(`chat render-process-gone ${JSON.stringify(details)}`);
+  });
+  chatWindow.webContents.on("context-menu", (_, params) => {
+    Menu.buildFromTemplate([
+      {
+        label: "复制",
+        role: "copy",
+        enabled: params.selectionText.trim().length > 0
+      }
+    ]).popup({ window: chatWindow ?? undefined });
   });
   chatWindow.loadURL(rendererUrl("chat")).catch((error: Error) => {
     logDev(`chat loadURL failed ${error.message}`);

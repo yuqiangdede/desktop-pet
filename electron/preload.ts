@@ -26,6 +26,9 @@ const api: DesktopPetApi = {
     onDone: (callback) => subscribe<ChatDone>("chat:done", callback),
     onError: (callback) => subscribe<ChatError>("chat:error", callback)
   },
+  clipboard: {
+    writeText: (text) => ipcRenderer.invoke("clipboard:writeText", text)
+  },
   character: {
     list: () => ipcRenderer.invoke("character:list"),
     pickVideoFile: () => ipcRenderer.invoke("character:pickVideoFile"),

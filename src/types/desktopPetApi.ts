@@ -20,6 +20,9 @@ export interface DesktopPetApi {
     onDone(callback: (event: ChatDone) => void): () => void;
     onError(callback: (event: ChatError) => void): () => void;
   };
+  clipboard: {
+    writeText(text: string): Promise<void>;
+  };
   character: {
     list(): Promise<CharacterInfo[]>;
     pickVideoFile(): Promise<string | null>;

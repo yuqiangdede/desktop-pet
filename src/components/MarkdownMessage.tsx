@@ -2,6 +2,7 @@ import { Children, isValidElement, useEffect, useRef, useState, type ReactNode }
 import mermaid from "mermaid";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Check, Copy } from "lucide-react";
 
 interface MarkdownMessageProps {
   content: string;
@@ -39,6 +40,47 @@ function mermaidCodeFromPre(children: ReactNode) {
   return language === "mermaid" ? codeText(child.props.children) : null;
 }
 
+function codeFromPre(children: ReactNode) {
+  const child = Children.toArray(children)[0];
+  if (!isValidElement<CodeElementProps>(child)) return codeText(children);
+  return codeText(child.props.children);
+}
+
+function CopyableCodeBlock({ children, fallback = false }: { children: ReactNode; fallback?: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  const text = codeFromPre(children);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    };
+  }, []);
+
+  async function handleCopy() {
+    await window.desktopPet.clipboard.writeText(text);
+    setCopied(true);
+    if (timerRef.current !== null) window.clearTimeout(timerRef.current);
+    timerRef.current = window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  return (
+    <div className={`markdown-code-wrap ${fallback ? "markdown-code-wrap--fallback" : ""}`}>
+      <button
+        type="button"
+        className="markdown-code-copy"
+        title={copied ? "已复制" : "复制代码"}
+        aria-label={copied ? "代码已复制" : "复制代码"}
+        onClick={handleCopy}
+      >
+        {copied ? <Check size={14} /> : <Copy size={14} />}
+        <span>{copied ? "已复制" : "复制"}</span>
+      </button>
+      <pre className={`markdown-code ${fallback ? "markdown-code--fallback" : ""}`}>{children}</pre>
+    </div>
+  );
+}
+
 function MermaidBlock({ chart }: { chart: string }) {
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -70,9 +112,9 @@ function MermaidBlock({ chart }: { chart: string }) {
 
   if (failed) {
     return (
-      <pre className="markdown-code markdown-code--fallback">
+      <CopyableCodeBlock fallback>
         <code>{chart}</code>
-      </pre>
+      </CopyableCodeBlock>
     );
   }
 
@@ -94,7 +136,7 @@ const markdownComponents: Components = {
   pre({ children }) {
     const chart = mermaidCodeFromPre(children);
     if (chart !== null) return <MermaidBlock chart={chart} />;
-    return <pre className="markdown-code">{children}</pre>;
+    return <CopyableCodeBlock>{children}</CopyableCodeBlock>;
   }
 };
 

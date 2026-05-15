@@ -3,7 +3,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
 import { spawn } from "node:child_process";
-import { app, dialog, ipcMain, nativeImage } from "electron";
+import { app, clipboard, dialog, ipcMain, nativeImage } from "electron";
 import { PNG } from "pngjs";
 import { defaultConfig, defaultModelConfig, getActiveModelConfig, type AppConfig, type ModelConfig } from "../src/types/config";
 import type { CharacterConfig, CharacterInfo } from "../src/types/character";
@@ -1003,6 +1003,13 @@ export function registerIpc() {
     return next;
   });
   ipcMain.handle("window:resetPetPosition", () => resetPetPosition());
+
+  ipcMain.handle("clipboard:writeText", (_, text: string) => {
+    if (typeof text !== "string") {
+      throw new Error("剪贴板内容必须是字符串");
+    }
+    clipboard.writeText(text);
+  });
 
   ipcMain.handle("character:list", () => listCharacters());
   ipcMain.handle("character:pickVideoFile", async () => {
