@@ -14,6 +14,9 @@ interface CodeElementProps {
 
 let mermaidInitialized = false;
 let mermaidRenderId = 0;
+const longContentThreshold = 10000;
+const collapsedPreviewLength = 6000;
+const remarkPlugins = [remarkGfm];
 
 function initializeMermaid() {
   if (mermaidInitialized) return;
@@ -96,11 +99,36 @@ const markdownComponents: Components = {
 };
 
 export function MarkdownMessage({ content }: MarkdownMessageProps) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = content.length > longContentThreshold;
+  const shouldCollapse = isLong && !expanded;
+  const visibleContent = shouldCollapse ? content.slice(0, collapsedPreviewLength) : content;
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [content]);
+
+  if (shouldCollapse) {
+    return (
+      <div className="markdown-content">
+        <div className="markdown-preview-text">{visibleContent}</div>
+        <button type="button" className="message__expand" onClick={() => setExpanded(true)}>
+          展开全文
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="markdown-content">
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-        {content || "..."}
+      <ReactMarkdown remarkPlugins={remarkPlugins} components={markdownComponents}>
+        {visibleContent || "..."}
       </ReactMarkdown>
+      {isLong ? (
+        <button type="button" className="message__expand" onClick={() => setExpanded(false)}>
+          收起长文
+        </button>
+      ) : null}
     </div>
   );
 }

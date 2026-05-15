@@ -69,6 +69,33 @@ async function persist(sessions: ChatSession[]) {
   return chatService.saveSessions(sortSessions(sessions));
 }
 
+const deltaFlushDelayMs = 75;
+const streamingPersistDelayMs = 2200;
+const pendingDeltas = new Map<string, string>();
+const deltaFlushTimers = new Map<string, number>();
+let streamingPersistTimer: number | null = null;
+
+function clearDeltaState(requestId: string) {
+  const timer = deltaFlushTimers.get(requestId);
+  if (timer !== undefined) window.clearTimeout(timer);
+  deltaFlushTimers.delete(requestId);
+  pendingDeltas.delete(requestId);
+}
+
+function scheduleStreamingPersist(sessions: ChatSession[]) {
+  if (streamingPersistTimer !== null) window.clearTimeout(streamingPersistTimer);
+  streamingPersistTimer = window.setTimeout(() => {
+    streamingPersistTimer = null;
+    void persist(sessions);
+  }, streamingPersistDelayMs);
+}
+
+function cancelStreamingPersist() {
+  if (streamingPersistTimer === null) return;
+  window.clearTimeout(streamingPersistTimer);
+  streamingPersistTimer = null;
+}
+
 function nextActiveSessionId(sessions: ChatSession[], preferredId: string | null) {
   if (preferredId && sessions.some((session) => session.id === preferredId)) return preferredId;
   return sessions[0]?.id ?? null;
@@ -197,28 +224,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }
   },
   appendDelta: (requestId, delta) => {
-    if (get().activeRequestId !== requestId) return;
-    const current = activeSession(get());
-    if (!current) return;
-    const nextSession: ChatSession = {
-      ...current,
-      messages: current.messages.map((message, index, messages) =>
-        index === messages.length - 1 ? { ...message, content: message.content + delta } : message
-      ),
-      updatedAt: now()
-    };
-    const sessions = sortSessions([nextSession, ...get().sessions.filter((session) => session.id !== nextSession.id)]);
-    set({ sessions });
-    void persist(sessions);
+    pendingDeltas.set(requestId, (pendingDeltas.get(requestId) ?? "") + delta);
+    if (deltaFlushTimers.has(requestId)) return;
+
+    const flushTimer = window.setTimeout(() => {
+      deltaFlushTimers.delete(requestId);
+      if (get().activeRequestId !== requestId) {
+        pendingDeltas.delete(requestId);
+        return;
+      }
+      const buffered = pendingDeltas.get(requestId);
+      if (!buffered) return;
+      pendingDeltas.delete(requestId);
+
+      const current = activeSession(get());
+      if (!current) return;
+      const nextSession: ChatSession = {
+        ...current,
+        messages: current.messages.map((message, index, messages) =>
+          index === messages.length - 1 ? { ...message, content: message.content + buffered } : message
+        ),
+        updatedAt: now()
+      };
+      const sessions = sortSessions([nextSession, ...get().sessions.filter((session) => session.id !== nextSession.id)]);
+      set({ sessions });
+      scheduleStreamingPersist(sessions);
+    }, deltaFlushDelayMs);
+
+    deltaFlushTimers.set(requestId, flushTimer);
   },
   finishMessage: (requestId, content, attachments) => {
     if (get().activeRequestId !== requestId) return;
+    clearDeltaState(requestId);
+    cancelStreamingPersist();
     const current = activeSession(get());
     if (!current) return;
     const nextSession: ChatSession = {
       ...current,
       messages: current.messages.map((message, index, messages) =>
-        index === messages.length - 1 && !message.content
+        index === messages.length - 1
           ? { ...message, content, ...(attachments?.length ? { attachments } : {}) }
           : message
       ),
@@ -230,6 +274,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
   failMessage: (requestId, message) => {
     const isActiveRequest = get().activeRequestId === requestId;
+    clearDeltaState(requestId);
+    cancelStreamingPersist();
     const current = activeSession(get());
     if (!current) {
       set({ loading: false, activeRequestId: isActiveRequest ? null : get().activeRequestId, error: message });

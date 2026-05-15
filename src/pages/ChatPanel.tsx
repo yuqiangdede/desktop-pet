@@ -151,6 +151,7 @@ export function ChatPanel() {
           messages={activeSession?.messages ?? []}
           assistantName={assistantName}
           retrying={loading || Boolean(activeRequestId)}
+          streaming={Boolean(activeRequestId)}
           onRetry={(messageId) => {
             setInputError(null);
             void retryMessage(messageId, modelName);

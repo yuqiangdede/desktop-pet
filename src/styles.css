@@ -475,6 +475,27 @@ button {
   white-space: normal;
 }
 
+.message__streaming-text,
+.markdown-preview-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.message__expand {
+  margin-top: 8px;
+  padding: 4px 8px;
+  min-height: 0;
+  border-radius: 7px;
+  color: #5f4696;
+  background: rgba(111, 90, 161, 0.12);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.message__expand:hover {
+  background: rgba(111, 90, 161, 0.18);
+}
+
 .image-preview {
   position: fixed;
   inset: 0;

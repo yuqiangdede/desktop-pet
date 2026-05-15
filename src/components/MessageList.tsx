@@ -7,16 +7,30 @@ interface MessageListProps {
   messages: ChatMessage[];
   assistantName: string;
   retrying: boolean;
+  streaming: boolean;
   onRetry: (messageId: string) => void;
 }
 
-export function MessageList({ messages, assistantName, retrying, onRetry }: MessageListProps) {
+export function MessageList({ messages, assistantName, retrying, streaming, onRetry }: MessageListProps) {
   const listRef = useRef<HTMLDivElement>(null);
+  const autoFollowRef = useRef(true);
+  const messageCountRef = useRef(messages.length);
   const [preview, setPreview] = useState<ChatAttachment | null>(null);
 
   useEffect(() => {
-    listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: "smooth" });
+    const list = listRef.current;
+    if (!list || !autoFollowRef.current) return;
+    const messageCountChanged = messageCountRef.current !== messages.length;
+    messageCountRef.current = messages.length;
+    list.scrollTo({ top: list.scrollHeight, behavior: messageCountChanged ? "smooth" : "auto" });
   }, [messages]);
+
+  function handleScroll() {
+    const list = listRef.current;
+    if (!list) return;
+    const distanceFromBottom = list.scrollHeight - list.scrollTop - list.clientHeight;
+    autoFollowRef.current = distanceFromBottom < 96;
+  }
 
   useEffect(() => {
     if (!preview) return;
@@ -33,8 +47,10 @@ export function MessageList({ messages, assistantName, retrying, onRetry }: Mess
 
   return (
     <>
-      <div className="message-list" ref={listRef}>
-        {messages.map((message) => (
+      <div className="message-list" ref={listRef} onScroll={handleScroll}>
+        {messages.map((message, index) => {
+          const isStreamingMessage = streaming && index === messages.length - 1 && message.role === "assistant" && !message.error;
+          return (
           <div key={message.id} className={`message message--${message.role} ${message.error ? "message--error" : ""}`}>
             <div className="message__meta">
               <div className="message__role">
@@ -75,14 +91,17 @@ export function MessageList({ messages, assistantName, retrying, onRetry }: Mess
                   ))}
                 </div>
               ) : null}
-              {message.role === "assistant" && !message.error ? (
+              {isStreamingMessage ? (
+                <div className="message__streaming-text">{message.content || "..."}</div>
+              ) : message.role === "assistant" && !message.error ? (
                 <MarkdownMessage content={message.content} />
               ) : (
                 message.content || (message.attachments?.length ? "" : "...")
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
       {preview ? (
         <div className="image-preview" role="dialog" aria-modal="true" aria-label={preview.name} onClick={() => setPreview(null)}>
